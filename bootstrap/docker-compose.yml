@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+    asterisk:
+        restart: 'always'
+        build:
+            context: .
+            dockerfile: asterisk.Dockerfile
+        container_name: asterisk
+        network_mode: bridge
+        user: asterisk
+        volumes:
+          - ./configs/sip.conf:/etc/asterisk/sip.conf
+          - ./configs/modules.conf:/etc/asterisk/modules.conf
+          - ./configs/extensions.conf:/etc/asterisk/extensions.conf
+          - ./configs/rtp.conf:/etc/asterisk/rtp.conf
+        ports:
+            - "5060:5060/udp"
+            - "5060:5060/tcp"
+            - "10000-10010:10000-10010/udp"
+        command: ["/usr/sbin/asterisk", "-f", "-vvv"]
