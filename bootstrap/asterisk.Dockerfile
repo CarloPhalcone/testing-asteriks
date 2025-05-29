@@ -57,13 +57,13 @@ RUN ./contrib/scripts/install_prereq install || echo "Skipping prereq install" \
     && ./contrib/scripts/get_mp3_source.sh || echo "Skipping mp3 source"
 
 # Конфигурируем и компилируем Asterisk
-RUN ./configure
-RUN make menuselect.makeopts
-RUN menuselect/menuselect --enable CORE-SOUNDS-RU-WAV --enable CORE-SOUNDS-RU-ULAW
-RUN make -j2
-RUN make install
-RUN make samples
-RUN make config
+RUN ./configure \
+    && make menuselect.makeopts \
+    && menuselect/menuselect --enable CORE-SOUNDS-RU-WAV --enable CORE-SOUNDS-RU-ULAW \
+    && make \
+    && make install \
+    && make samples \
+    && make config
 
 # Настраиваем владельца для установленных файлов Asterisk
 RUN chown -R asterisk:asterisk /usr/lib/asterisk /var/lib/asterisk /var/spool/asterisk /var/log/asterisk /var/run/asterisk /etc/asterisk
