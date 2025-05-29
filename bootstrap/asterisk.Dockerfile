@@ -1,21 +1,10 @@
-# Используем базовый образ Ubuntu 20.04
-FROM ubuntu:20.04
+# Используем базовый образ Ubuntu 22.04 (LTS, поддержка до 2027 года)
+FROM ubuntu:22.04
 
 # Устанавливаем переменную окружения для избежания интерактивных запросов
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Настраиваем часовой пояс
-RUN ln -fs /usr/share/zoneinfo/Asia/Almaty /etc/localtime \
-    && echo "Asia/Almaty" > /etc/timezone
-
-# Настраиваем libvpb1
-RUN echo "libvpb1 vpb-driver-region 7" | debconf-set-selections
-
-# Обновляем источники на архивные
-RUN sed -i 's|http://old-releases.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list || true \
-    && sed -i 's|http://security.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list || true
-
-# Устанавливаем зависимости
+# Обновляем список пакетов и устанавливаем зависимости, включая tzdata и libedit-dev
 RUN apt-get update && apt-get install -y \
     bash \
     curl \
@@ -32,42 +21,40 @@ RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
     uuid-dev \
     libjansson-dev \
-    libssl1.1 \
-    libncurses5 \
-    libnewt0.52 \
-    libxml2 \
-    libsqlite3-0 \
-    uuid \
-    libjansson4 \
+    tzdata \
+    libedit-dev \
     && apt-get clean \
-    && apt-get autoremove -y
+    && rm -rf /var/lib/apt/lists/*
+
+# Настраиваем часовой пояс
+RUN ln -fs /usr/share/zoneinfo/Asia/Almaty /etc/localtime \
+    && echo "Asia/Almaty" > /etc/timezone \
+    && dpkg-reconfigure -f noninteractive tzdata
 
 # Создаем пользователя и группу для Asterisk
 RUN groupadd -r asterisk && useradd -r -g asterisk -d /var/lib/asterisk asterisk
 
 # Создаем необходимые директории
-RUN mkdir -p /var/run/asterisk /var/log/asterisk /var/spool/asterisk /etc/asterisk
+RUN mkdir -p /var/run/asterisk /var/log/asterisk /var/spool/asterisk/voicemail /etc/asterisk \
+    && chown -R asterisk:asterisk /var/run/asterisk /var/log/asterisk /var/spool/asterisk /etc/asterisk \
+    && chmod -R 750 /var/run/asterisk /var/log/asterisk /var/spool/asterisk /etc/asterisk
 
 # Переходим в рабочий каталог
 WORKDIR /usr/src
 
 # Скачиваем и распаковываем Asterisk
 ARG ASTERISK_VERSION=18.23.0
-RUN wget https://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTERISK_VERSION}.tar.gz \
-    && tar -zxvf asterisk-${ASTERISK_VERSION}.tar.gz \
-    && rm asterisk-${ASTERISK_VERSION}.tar.gz
+RUN wget -O asterisk.tar.gz https://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTERISK_VERSION}.tar.gz \
+    && tar -zxvf asterisk.tar.gz \
+    && rm asterisk.tar.gz \
+    && mv asterisk-${ASTERISK_VERSION} asterisk
 
 # Переходим в каталог Asterisk
-WORKDIR /usr/src/asterisk-${ASTERISK_VERSION}
+WORKDIR /usr/src/asterisk
 
-# Выполняем скрипты, если они есть
-RUN if [ -d "contrib/scripts" ]; then \
-    chmod +x contrib/scripts/get_mp3_source.sh contrib/scripts/install_prereq || true; \
-    ./contrib/scripts/get_mp3_source.sh || echo "Skipping mp3 source"; \
-    ./contrib/scripts/install_prereq install || echo "Skipping prereq install"; \
-  else \
-    echo "Warning: contrib/scripts directory not found, skipping optional scripts"; \
-  fi
+# Устанавливаем дополнительные зависимости и звуковые файлы
+RUN ./contrib/scripts/install_prereq install || echo "Skipping prereq install" \
+    && ./contrib/scripts/get_mp3_source.sh || echo "Skipping mp3 source"
 
 # Конфигурируем и компилируем Asterisk
 RUN ./configure \
@@ -78,13 +65,19 @@ RUN ./configure \
     && make samples \
     && make config
 
-# Настраиваем владельца директорий
-RUN chown -R asterisk:asterisk /var/run/asterisk /var/lib/asterisk /var/spool/asterisk /var/log/asterisk /usr/lib/asterisk /etc/asterisk
+# Настраиваем владельца для установленных файлов Asterisk
+RUN chown -R asterisk:asterisk /usr/lib/asterisk /var/lib/asterisk /var/spool/asterisk /var/log/asterisk /var/run/asterisk /etc/asterisk
 
 # Настраиваем Asterisk для запуска от пользователя asterisk
 RUN sed -i 's/#AST_USER="asterisk"/AST_USER="asterisk"/g' /etc/default/asterisk \
     && sed -i 's/#AST_GROUP="asterisk"/AST_GROUP="asterisk"/g' /etc/default/asterisk
 
+# Открываем порты для Asterisk (SIP и RTP)
+EXPOSE 5060/udp 10000-20000/udp
+
+# Указываем том для хранения записей
+VOLUME /var/spool/asterisk/voicemail
+
 # Указываем команду по умолчанию
 USER asterisk
-CMD ["/bin/bash", "-c", "/usr/sbin/asterisk -f -vvv"]
+CMD ["/usr/sbin/asterisk", "-f", "-vvv"]
