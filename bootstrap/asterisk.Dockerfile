@@ -62,12 +62,12 @@ WORKDIR /usr/src/asterisk-${ASTERISK_VERSION}
 
 # Выполняем скрипты, если они есть
 RUN if [ -d "contrib/scripts" ]; then \
-        chmod +x contrib/scripts/get_mp3_source.sh contrib/scripts/install_prereq; \
-        contrib/scripts/get_mp3_source.sh; \
-        contrib/scripts/install_prereq install; \
-    else \
-        echo "Warning: contrib/scripts directory not found, skipping optional scripts"; \
-    fi
+    chmod +x contrib/scripts/get_mp3_source.sh contrib/scripts/install_prereq || true; \
+    ./contrib/scripts/get_mp3_source.sh || echo "Skipping mp3 source"; \
+    ./contrib/scripts/install_prereq install || echo "Skipping prereq install"; \
+  else \
+    echo "Warning: contrib/scripts directory not found, skipping optional scripts"; \
+  fi
 
 # Конфигурируем и компилируем Asterisk
 RUN ./configure \
