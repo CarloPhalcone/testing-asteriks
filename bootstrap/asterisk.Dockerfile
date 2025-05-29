@@ -12,8 +12,8 @@ RUN ln -fs /usr/share/zoneinfo/Asia/Almaty /etc/localtime \
 RUN echo "libvpb1 vpb-driver-region 7" | debconf-set-selections
 
 # Обновляем источники на архивные
-RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://old-releases.ubuntu.com/ubuntu|g' /etc/apt/sources.list \
-    && sed -i 's|http://security.ubuntu.com/ubuntu|http://old-releases.ubuntu.com/ubuntu|g' /etc/apt/sources.list
+RUN sed -i 's|http://old-releases.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list || true \
+    && sed -i 's|http://security.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list || true
 
 # Устанавливаем зависимости
 RUN apt-get update && apt-get install -y \
