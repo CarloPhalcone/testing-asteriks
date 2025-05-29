@@ -14,6 +14,7 @@ services:
           - ./configs/modules.conf:/etc/asterisk/modules.conf
           - ./configs/extensions.conf:/etc/asterisk/extensions.conf
           - ./configs/rtp.conf:/etc/asterisk/rtp.conf
+          - ./voices:/var/lib/asterisk/sounds/custom
         ports:
             - "5060:5060/udp"
             - "5060:5060/tcp"
